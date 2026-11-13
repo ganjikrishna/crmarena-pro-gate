@@ -1,0 +1,127 @@
+--- /dev/null
++++ b/meter_run.py
+@@ -0,0 +1,68 @@
++#!/usr/bin/env python3
++"""Metered runner for CRMArena-Pro (disclosed instrumentation; scoring untouched).
++
++Wraps every LiteLLM completion call made by run_tasks.py (agent loop,
++extractor, confidentiality judge, user simulator) and appends per-call token
++usage to meter/meter.jsonl. Pricing is computed separately by meter_tally.py
++at the Fireworks rate card in the re-scope design.
++"""
++import os, sys, json, time
++
++# Sanitize no_proxy before httpx/litellm import (bare ::1 breaks httpx URL parsing)
++os.environ["no_proxy"] = "localhost,127.0.0.1"
++os.environ["NO_PROXY"] = "localhost,127.0.0.1"
++
++METER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "meter", "meter.jsonl")
++os.makedirs(os.path.dirname(METER_PATH), exist_ok=True)
++
++import litellm
++
++_orig_completion = litellm.completion
++
++
++def _get(obj, *names):
++    for n in names:
++        if obj is None:
++            return None
++        if isinstance(obj, dict):
++            obj = obj.get(n)
++        else:
++            obj = getattr(obj, n, None)
++    return obj
++
++
++def _wrapped(*args, **kwargs):
++    res = _orig_completion(*args, **kwargs)
++    try:
++        usage = getattr(res, "usage", None)
++        prompt = _get(usage, "prompt_tokens") or 0
++        completion = _get(usage, "completion_tokens") or 0
++        cached = _get(usage, "prompt_tokens_details", "cached_tokens")
++        if cached is None:
++            cached = _get(usage, "prompt_cache_hit_tokens") or 0
++        rec = {
++            "ts": time.time(),
++            "model": kwargs.get("model") or getattr(res, "model", None),
++            "prompt_tokens": int(prompt),
++            "completion_tokens": int(completion),
++            "cached_tokens": int(cached or 0),
++        }
++        with open(METER_PATH, "a") as f:
++            f.write(json.dumps(rec) + "\n")
++    except Exception as e:  # metering must never break a run
++        print(f"[meter] failed to record usage: {e}", file=sys.stderr)
++    return res
++
++
++litellm.completion = _wrapped
++
++# chat_agent and users imported `completion` by name; rebind there too.
++import crm_sandbox.agents.chat_agent as _ca
++_ca.completion = _wrapped
++import crm_sandbox.env.users as _users
++_users.completion = _wrapped
++
++if __name__ == "__main__":
++    import runpy
++    sys.argv[0] = "run_tasks.py"
++    runpy.run_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "run_tasks.py"), run_name="__main__")
+--- /dev/null
++++ b/meter_tally.py
+@@ -0,0 +1,53 @@
++#!/usr/bin/env python3
++"""Tally meter/meter.jsonl at the re-scope rate card and append a snapshot to METER.md.
++
++Rate card (Fireworks serverless, DeepSeek V4.1 Flash, per re-scope 2026-11-13):
++  input $0.30 / 1M, cached input $0.006 / 1M, output $1.20 / 1M.
++Cached tokens are counted only when the provider reports them; otherwise all
++input is priced at the full rate (conservative upper bound).
++"""
++import json, os, sys, time
++
++HERE = os.path.dirname(os.path.abspath(__file__))
++METER_JSONL = os.path.join(HERE, "meter", "meter.jsonl")
++METER_MD = os.path.join(HERE, "METER.md")
++RATE_IN, RATE_CACHED, RATE_OUT = 0.30, 0.006, 1.20  # per 1M tokens
++
++
++def main():
++    label = sys.argv[1] if len(sys.argv) > 1 else "snapshot"
++    calls = prompt = completion = cached = 0
++    if os.path.exists(METER_JSONL):
++        with open(METER_JSONL) as f:
++            for line in f:
++                line = line.strip()
++                if not line:
++                    continue
++                r = json.loads(line)
++                calls += 1
++                prompt += r.get("prompt_tokens", 0)
++                completion += r.get("completion_tokens", 0)
++                cached += r.get("cached_tokens", 0)
++    noncached = max(prompt - cached, 0)
++    cost = noncached * RATE_IN / 1e6 + cached * RATE_CACHED / 1e6 + completion * RATE_OUT / 1e6
++    ts = time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime())
++    block = (
++        f"\n## Snapshot — {label} — {ts}\n"
++        f"- LLM calls metered: {calls}\n"
++        f"- Prompt tokens: {prompt:,} (cached reported: {cached:,})\n"
++        f"- Completion tokens: {completion:,}\n"
++        f"- Metered cost at rate card (${RATE_IN} in / ${RATE_CACHED} cached / ${RATE_OUT} out per 1M): **${cost:.4f}**\n"
++    )
++    header = ""
++    if not os.path.exists(METER_MD):
++        header = ("# CRMArena-Pro run meter (Fireworks credits, $0 cash)\n"
++                  "Rate card: DeepSeek V4.1 Flash $0.30 input / $0.006 cached input / $1.20 output per 1M tokens (re-scope 2026-11-13).\n"
++                  "Hard stops: Stage 0 < $0.25; Stage 1 cumulative $10 including Stage 0.\n")
++    with open(METER_MD, "a") as f:
++        f.write(header + block)
++    print(block)
++    print(f"CUMULATIVE_METERED=${cost:.4f} calls={calls}")
++
++
++if __name__ == "__main__":
++    main()

@@ -1,0 +1,17 @@
+NOTICE — licensing position for this repository
+
+Original material in this repository (the writeup, results, tools, and gate
+spec) is licensed under the MIT License, Copyright (c) 2026
+Vinay K Ganji Krishna. See the LICENSE file.
+
+Exception: the patch files under patches/ contain small excerpts of upstream
+CRMArena code (by Salesforce AI Research) as diff context. Those excerpts
+remain under upstream's CC BY-NC 4.0 license and are not covered by the MIT
+License above. The LICENSE file states this exception explicitly.
+
+This repository does not redistribute the upstream CRMArena-Pro benchmark,
+its data, or its credentials. To reproduce the runs, obtain them from
+upstream: https://github.com/SalesforceAIResearch/CRMArena — credit to
+Salesforce AI Research. The benchmark paper is "CRMArena-Pro: Holistic
+Assessment of LLM Agents Across Diverse Business Scenarios and Interactions"
+(arXiv:2505.18878).

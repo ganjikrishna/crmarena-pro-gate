@@ -1,0 +1,20 @@
+DIAGNOSTIC ONLY — NOT APPLIED in the Stage 1 vanilla or Stage 2 gated headline runs.
+Apply only for the separately labelled diagnostic re-run described in the README and results; revert immediately afterward.
+
+--- a/crm_sandbox/agents/chat_agent.py
++++ b/crm_sandbox/agents/chat_agent.py
+@@ -138,6 +138,14 @@
+             
+             
+             message = res.choices[0].message.model_dump()
++            # DIAGNOSTIC ONLY (Stage 2 diagnostic arm, PATCHES.md §7; temporary,
++            # reverted after the diagnostic run): normalize an empty (None)
++            # message content to "" so the stock parser treats it as an
++            # empty/invalid action and the episode continues, instead of the
++            # episode dying at message_action_parser (line ~200). No
++            # re-prompt, no retry, no scoring change.
++            if message.get("content") is None:
++                message["content"] = ""
+             
+             
+             usage = res.usage

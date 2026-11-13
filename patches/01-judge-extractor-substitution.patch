@@ -1,0 +1,24 @@
+--- a/crm_sandbox/env/env.py
++++ b/crm_sandbox/env/env.py
+@@ -12,8 +12,8 @@
+         self,
+         tasks: List[Dict],
+         task_index: Optional[int] = None,
+-        user_model: str = "gpt-4o-2024-08-06",
+-        user_provider: Optional[str] = "openai",
++        user_model: str = "fireworks_ai/accounts/fireworks/models/deepseek-v4p1-flash",
++        user_provider: Optional[str] = "fireworks_ai",
+         org_type: str = "b2b",
+     ) -> None:
+         super().__init__()
+@@ -184,8 +184,8 @@
+         tasks: List[Dict],
+         max_user_turns: int = 10,
+         task_index: Optional[int] = None,
+-        user_model: str = "gpt-4o-2024-08-06",
+-        user_provider: Optional[str] = "openai",
++        user_model: str = "fireworks_ai/accounts/fireworks/models/deepseek-v4p1-flash",
++        user_provider: Optional[str] = "fireworks_ai",
+         org_type: str = "b2b",
+     ) -> None:
+     

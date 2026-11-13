@@ -1,0 +1,24 @@
+--- a/crm_sandbox/data/assets.py
++++ b/crm_sandbox/data/assets.py
+@@ -30,6 +30,21 @@
+ 
+ TASKS_B2B = [data for data in crmarena_pro["b2b"]]
+ 
++# --- Local subset patch (disclosed in PATCHES.md; data loading only, scoring untouched) ---
++# If CRM_SUBSET_PER_TASK is set, keep only the first N instances per task, in dataset order.
++import os as _os
++_subset_n = _os.environ.get("CRM_SUBSET_PER_TASK")
++if _subset_n:
++    _n = int(_subset_n)
++    _counts = {}
++    _sliced = []
++    for _row in TASKS_B2B:
++        _t = _row["task"]
++        if _counts.get(_t, 0) < _n:
++            _sliced.append(_row)
++            _counts[_t] = _counts.get(_t, 0) + 1
++    TASKS_B2B = _sliced
++
+ TASKS_B2B_INTERACTIVE = [data for data in crmarena_pro["b2b_interactive"]]
+ 
+ TASKS_B2C = [data for data in crmarena_pro["b2c"]]
